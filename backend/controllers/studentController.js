@@ -79,18 +79,40 @@ exports.getEligibleColleges = async (req, res) => {
 };
 
 // Register for college
+
 exports.registerCollege = async (req, res) => {
   try {
     const { collegeId } = req.body;
+    const studentId = req.student?.id;
+
+    if (!studentId) {
+      return res.status(401).json({ message: "Unauthorized. Student not found." });
+    }
+
+    if (!collegeId) {
+      return res.status(400).json({ message: "College ID is required." });
+    }
+
+    const collegeExists = await College.findById(collegeId);
+    if (!collegeExists) {
+      return res.status(404).json({ message: "College not found." });
+    }
+
     const student = await Student.findByIdAndUpdate(
-      req.student.id,
-      { $addToSet: { collegePreferences: collegeId } },
+      studentId,
+      { $addToSet: { collegePreferences: collegeId } }, // Ensures unique entries
       { new: true }
     ).select("-password");
-    
-    res.status(200).json(student);
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found." });
+    }
+
+    res.status(200).json({ message: "College registered successfully", student });
   } catch (err) {
-    res.status(500).json({ message: "Server Error" });
+    console.error("Error in registerCollege:", err);
+    res.status(500).json({ message: "Server Error", error: err.message });
   }
 };
+
 
