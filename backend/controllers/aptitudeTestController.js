@@ -21,90 +21,77 @@ exports.startTest = async (req, res) => {
   }
 };
 
-// Submit Test - Process answers and calculate score
 exports.submitTest = async (req, res) => {
   try {
     const studentId = req.body.studentId;
-    const answers = req.body.answers; // Array of answers from the user
+    const answers = req.body.answers;
 
-    // Validate if the student exists
+    // Validate student existence
     const student = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Fetch the corresponding questions based on the answers
+    // Fetch questions for the given answers
     const questionIds = answers.map(answer => answer.questionId);
     const questions = await Question.find({ '_id': { $in: questionIds } });
 
-    // Initialize scores
-    let verbalScore = 0, quantitativeScore = 0, generalKnowledgeScore = 0;
-
-    // Calculate scores based on the answers
+    let correctAnswers = 0;
     answers.forEach(answer => {
       const question = questions.find(q => q._id.toString() === answer.questionId.toString());
-      if (question.correctAnswerIndex === answer.selectedIndex) {
-        switch (question.section) {
-          case "verbal":
-            verbalScore += 1;
-            break;
-          case "quantitative":
-            quantitativeScore += 1;
-            break;
-          case "general":
-            generalKnowledgeScore += 1;
-            break;
-        }
+      if (question && question.correctAnswerIndex === answer.selectedIndex) {
+        correctAnswers++;
       }
     });
 
-    // Calculate total score
-    const totalScore = verbalScore + quantitativeScore + generalKnowledgeScore;
+    // Scale score out of 100
+    const totalQuestions = questions.length;
+    const totalScore = Math.round((correctAnswers / totalQuestions) * 100); 
 
-    // Save the test results
+    // Save test result
     const aptitudeTestResult = new AptitudeTest({
-      studentId: studentId,
-      verbalScore,
-      quantitativeScore,
-      generalKnowledgeScore,
+      studentId,
       totalScore,
       date: new Date(),
     });
 
     await aptitudeTestResult.save();
 
-    // Update student's total test score
+    // Update student's aptitude score
     student.aptitudeTestScore = totalScore;
     await student.save();
 
     res.status(201).json({
       message: 'Aptitude test submitted successfully',
-      totalScore,
-      verbalScore,
-      quantitativeScore,
-      generalKnowledgeScore,
+      totalScore,  // Score out of 100
     });
   } catch (err) {
     res.status(500).json({ message: "Error processing the test", error: err.message });
   }
 };
 
-// View Results - Get the user's test results
-exports.viewResults = async (req, res) => {
-  try {
-    const studentId = req.body.studentId;
 
-    // Fetch the latest test results for the student
-    const results = await AptitudeTest.findOne({ studentId: studentId })
-      .sort({ createdAt: -1 }) // Get the most recent test result
-      .populate('studentId', 'name email'); // Populate student info
-    
-    if (!results) {
-      return res.status(404).json({ message: 'Test results not found' });
+exports.getResults = async (req, res) => {
+  try {
+    const { studentId } = req.query;
+
+    // Validate studentId
+    if (!studentId) {
+      return res.status(400).json({ message: "Student ID is required" });
     }
 
-    res.status(200).json(results);
+    // Fetch the latest test result for the student
+    const result = await AptitudeTest.findOne({ studentId })
+      .sort({ createdAt: -1 }) // Get the most recent result
+      .select("totalScore verbalScore quantitativeScore generalKnowledgeScore");
+
+    if (!result) {
+      return res.status(404).json({ message: "No test results found" });
+    }
+
+    res.status(200).json(result);
   } catch (err) {
-    res.status(500).json({ message: "Error fetching results", error: err.message });
+    console.error("Error fetching test results:", err);
+    res.status(500).json({ message: "Server Error" });
   }
 };

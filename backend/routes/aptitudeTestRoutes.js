@@ -6,6 +6,6 @@ router.get('/start-test', aptitudeTestController.startTest);
 
 router.post('/submit-test', aptitudeTestController.submitTest);
 
-router.get('/results', aptitudeTestController.viewResults);
+router.get('/results', aptitudeTestController.getResults);
 
 module.exports = router;
