@@ -1,4 +1,3 @@
-Here’s a comprehensive and detailed `README.md` file for your **Career Guidance App**:
 
 ---
 
